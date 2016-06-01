@@ -1,1 +1,1 @@
-# kotlin-small-parser-generator
+# kotlin-ll1-parser-generator

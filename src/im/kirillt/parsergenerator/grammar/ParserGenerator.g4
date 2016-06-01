@@ -1,0 +1,5 @@
+grammar ParserGenerator;
+
+input
+    :
+    ;
