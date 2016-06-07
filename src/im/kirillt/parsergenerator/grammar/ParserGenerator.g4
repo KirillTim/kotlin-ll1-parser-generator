@@ -2,6 +2,9 @@ grammar ParserGenerator;
 @parser::header {
 import im.kirillt.parsergenerator.Utils;
 import im.kirillt.parsergenerator.ParserGenerator;
+import im.kirillt.parsergenerator.ParserGenerator.NonTerminal;
+import im.kirillt.parsergenerator.ParserGenerator.Terminal;
+import im.kirillt.parsergenerator.ParserGenerator.RuleItem;
 }
 input
     : line*
@@ -32,21 +35,25 @@ ruleParametr
     : '[' ANY_STRING ']'
     ;
 
-ruleChild[String ruleName] locals[ArrayList<String> children]
+ruleChild[String ruleName] locals[ArrayList<RuleItem> children]
 @init {
-    $children = new ArrayList<String>();
+    $children = new ArrayList<RuleItem>();
     Utils.p("rule name:"+$ruleName);
 }
 @after {
     ParserGenerator.addRule($ruleName, $children);
 }
-    : (ruleChildOptions {$children.add($ruleChildOptions.text);})+ (action)?
+    : (ruleChildOptions {$children.add($ruleChildOptions.item);})* (action)?
     ;
 
-ruleChildOptions returns[String text]
-    : ruleKeyword {$text = $ruleKeyword.text; Utils.p("rule");}
-    | tokenKeyword {$text = $tokenKeyword.text; Utils.p("token");}
-    | stringLiteral {$text = ParserGenerator.addToken($stringLiteral.text, ""); Utils.p("literal");}
+ruleChildOptions returns[RuleItem item]
+    : ruleKeyword {$item = new NonTerminal($ruleKeyword.text); Utils.p("rule");}
+    | tokenKeyword {$item = new Terminal($tokenKeyword.text); Utils.p("token");}
+    | stringLiteral {
+                        String name = ParserGenerator.addToken($stringLiteral.text, "");
+                        $item = new Terminal(name);
+                        Utils.p("literal");
+                    }
     ;
 
 action
@@ -81,7 +88,7 @@ grmrName
     ;
 
 ANY_STRING
-    : .
+    : [a-z]+
     ;
 
 stringLiteral
@@ -92,4 +99,4 @@ STRING_LITERAL
    : '\'' ('\'\'' | ~ ('\''))* '\''
    ;
 
-WS : [ \t \r \n]+ -> skip ;
+WS : [ \t\r\n]+ -> skip ;
