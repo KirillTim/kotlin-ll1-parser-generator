@@ -7,7 +7,7 @@ import im.kirillt.parsergenerator.ParserGenerator.Terminal;
 import im.kirillt.parsergenerator.ParserGenerator.RuleItem;
 }
 input
-    : line*
+    : grammaHeader line*
     ;
 
 line
@@ -16,7 +16,7 @@ line
     ;
 
 grammaHeader
-    : 'grammar ' grmrName ';' {ParserGenerator.grammarName = $grmrName.text;}
+    : 'grammar' grmrName ';' {ParserGenerator.grammarName = $grmrName.text;}
     ;
 
 ruleR :
@@ -24,26 +24,27 @@ ruleR :
     ;
 
 ruleHead returns [String name]
-    : ruleKeyword ruleParameterList {$name = $ruleKeyword.text;}
+    : ruleKeyword ruleParameterList[$ruleKeyword.text] {$name = $ruleKeyword.text;}
     ;
 
-ruleParameterList
-    : (ruleParametr)? ('returns' ruleParametr)? ('locals' ruleParametr)?
+ruleParameterList[String ruleName]
+    : (ruleParametr)? ('returns' ruleParametr)? //('locals' ruleParametr)?
     ;
 
 ruleParametr
-    : '[' ANY_STRING ']'
+    : '[' type=ID name=ID ']'
     ;
 
 ruleChild[String ruleName] locals[ArrayList<RuleItem> children]
 @init {
     $children = new ArrayList<RuleItem>();
     Utils.p("rule name:"+$ruleName);
+    String rulAection = "";
 }
 @after {
-    ParserGenerator.addRule($ruleName, $children);
+    ParserGenerator.addRule($ruleName, $children, rulAection);
 }
-    : (ruleChildOptions {$children.add($ruleChildOptions.item);})* (action)?
+    : (ruleChildOptions {$children.add($ruleChildOptions.item);})* (action {rulAection = $action.text;})?
     ;
 
 ruleChildOptions returns[RuleItem item]
@@ -57,8 +58,18 @@ ruleChildOptions returns[RuleItem item]
     ;
 
 action
-    : '{' ANY_STRING '}'
+    : ACTION
     ;
+
+ACTION
+	:	'{'
+		(	ACTION
+        |	'/*' .*? '*/'
+        |	'//' ~[\r\n]*
+        |	.
+		)*?
+		('}'|EOF)
+	;
 
 token
     : tokenKeyword ':' stringLiteral + ';'
@@ -71,25 +82,19 @@ ruleKeyword
     : RULE_KEYWORD
     ;
 
-RULE_KEYWORD
-    : ('a' .. 'z')('a' .. 'z' | 'A' .. 'Z' | '_')*
-    ;
-
 tokenKeyword
     : TOKEN_KEYWORD
     ;
 
-TOKEN_KEYWORD
-    : ('A' .. 'Z')('a' .. 'z' | 'A' .. 'Z' | '_')*
-    ;
-
 grmrName
-    : ANY_STRING
+    : ID
     ;
 
-ANY_STRING
-    : [a-z]+
-    ;
+TOKEN_KEYWORD: ('A'..'Z') ('A'..'Z'|'_')*;
+
+RULE_KEYWORD: ('a'..'z') ('a'..'z'|'A'..'Z'|'0'..'9'|'_'|'?')*;
+
+ID: ('a'..'z'|'A'..'Z'|'_') ('a'..'z'|'A'..'Z'|'0'..'9'|'_'|'?')*;
 
 stringLiteral
     : STRING_LITERAL
