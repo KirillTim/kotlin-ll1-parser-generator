@@ -6,6 +6,7 @@ import java.util.*
 import im.kirillt.parsergenerator.GeneratorUtils.Indenter
 import im.kirillt.parsergenerator.GeneratorUtils.contextClassName
 import im.kirillt.parsergenerator.base.BaseRuleContext
+import im.kirillt.parsergenerator.base.EOF
 
 object ParserGenerator {
     open class RuleItem(val name: String) {
@@ -32,30 +33,31 @@ object ParserGenerator {
     val ruleParams = mutableMapOf<String, RuleParams>()
 
     class Derivation(val from: NonTerminal, val children: List<RuleItem>, val sourceCode: String = "") {
-        fun generateMethod(number: Int): String {
+        fun generateBlock(number: Int): String {
             val result = StringBuilder()
             val indenter = Indenter(result)
-            indenter.writeln("fun ${from.name}_$number() {")
+            //indenter.writeln("fun ${from.name}_$number() {")
             indenter.indented {
                 indenter.writeln("var __text = \"\"")
                 for ((index, child) in children.withIndex()) {
                     if (child is NonTerminal) {
                         val typeName = contextClassName(child.name)
-                        val varName = "__"+child.name+"_"+index
-                        val funCall = child.name+"()"
-                        indenter.writeln("$typeName $varName = $funCall")
+                        val varName = "__" + child.name + "_" + index
+                        val funCall = child.name + "()"
+                        indenter.writeln("var $varName = $funCall")
                         indenter.writeln("__text += $varName.text")
                     } else if (child is Terminal) {
-                        indenter.writeln("if (tokenizer.curToken().name != \"${child.name}\" {")
+                        indenter.writeln("if (tokenizer.curToken!!.name != \"${child.name}\") {")
                         indenter.indented {
-                            indenter.writeln("throw Exception(\"expected token '${child.name}', but get 'tokenizer.curToken().name'\")")
+                            indenter.writeln("throw Exception(\"expected token '${child.name}', but get \"+tokenizer.curToken!!.name)")
                         }
                         indenter.writeln("}")
-                        indenter.writeln("__text += tokenizer.curToken().text")
+                        indenter.writeln("__text += tokenizer.curToken!!.text")
                         indenter.writeln("tokenizer.nextToken()")
                     }
                 }
-                indenter.writeln(sourceCode)
+                val action = sourceCode.dropWhile { it == '{' }.dropLastWhile { it == '}' }
+                indenter.writeln(action)
                 indenter.writeln("return ${contextClassName(from.name)}(text = __text)")
             }
             indenter.writeln("}")
@@ -67,13 +69,13 @@ object ParserGenerator {
             if (first is Terminal)
                 return listOf(first);
             else
-                return rules[from]!!.flatMap { it.first() }
+                return rules[first]!!.flatMap { it.first() }
         }
     }
 
 
     val START = NonTerminal("start")
-    val EOF = Terminal("$")
+    val EOFTerminal = Terminal("$")
     val EPS = Terminal("")
     @JvmField
     var grammarName = ""
@@ -150,7 +152,7 @@ object ParserGenerator {
         }
 
         rules.keys.forEach { FOLLOW[it] = mutableSetOf() }
-        FOLLOW[START] = mutableSetOf(EOF)
+        FOLLOW[START] = mutableSetOf(EOFTerminal)
         changed = true
         while (changed) {
             val oldSize = FOLLOW.map { it.value.size }.sum()
@@ -186,13 +188,63 @@ object ParserGenerator {
             var arg = ""
             if (attr.argument != null)
                 arg = "val ${attr.argument.name}: ${attr.argument.type}, "
-            result += " class ${contextClassName(rule)}(${arg}text: String) : BaseRuleContext(text)"
+            result += " class ${contextClassName(rule)}(${arg}text: String = \"\") : BaseRuleContext(text)"
         }
         return result
     }
 
-    fun generateMethod() {
+    fun generateMethod(rule: NonTerminal, derivations: MutableList<Derivation>): String {
+        val result = StringBuilder()
+        val indenter = GeneratorUtils.Indenter(result)
+        indenter.writeln("fun ${rule.name}(): ${GeneratorUtils.contextClassName(rule.name)}{")
+        indenter.indented {
+            var epsRuleInd = -1
+            for ((ind,option) in derivations.withIndex()) {
+                if (option.children.size == 1 && option.children.first() == EPS) {
+                    epsRuleInd = ind
+                    continue;
+                }
+                val sj = StringJoiner(" || ", "if (", ") {")
+                for (tok in option.first()) {
+                    sj.add("tokenizer.curToken!!.name == \"${tok.name}\"")
+                }
+                indenter.writeln(sj.toString())
+                indenter.writeln(option.generateBlock(ind))
+            }
+            if (epsRuleInd != -1) {
+                indenter.writeln("//check FOLLOW")
+                val sj = StringJoiner(" || ", "if (", ") {")
+                for (tok in FOLLOW[rule]!!)
+                    sj.add("tokenizer.curToken!!.name == \"${tok.name}\"")
+                indenter.writeln(sj.toString())
+                indenter.indented {
+                    indenter.writeln("return ${GeneratorUtils.contextClassName(rule.name)}()")
+                }
+                indenter.writeln("}")
+            }
+            indenter.writeln("throw Exception(\"Unexpected token: \"+tokenizer.curToken!!.name)")
+        }
+        indenter.writeln("}")
+        return result.toString()
+    }
 
+    fun generateParser (folder:String = "myGen",  packageName:String = folder) {
+        val className = "${grammarName}Parser"
+        val file = File("$folder/$className.kt")
+        var str = ""
+        str = "package $packageName\nimport im.kirillt.parsergenerator.base.BaseRuleContext\n"+
+                "import $folder.Tokenizer\n";
+        constructFirstAndFollow()
+        for (i in rules)
+            ruleParams[i.key.name] = RuleParams()
+        generateContextClasses(ruleParams).forEach { str += it+"\n" }
+        str += "class $className(val tokenizer: ${grammarName}Tokenizer) {\n"
+        str += "init {tokenizer.nextToken()}\n"
+        for ((rule, derivations) in rules) {
+            str += generateMethod(rule, derivations)
+        }
+        str += "}\n"
+        file.writeText(str)
     }
 
     private fun reachable(): MutableSet<NonTerminal> {

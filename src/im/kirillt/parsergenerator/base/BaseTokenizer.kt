@@ -4,7 +4,7 @@ import java.util.regex.Pattern
 
 open class Token(val name: String, val text: String)
 
-class EOF(): Token("EOF", "")
+class EOF(): Token("$", "")
 
 open class BaseTokenizer(val tokens: Map<String, String>, val input: String) {
     private val patterns = tokens.map { Pair(Pattern.compile(it.value), it.key) }.toMap()
