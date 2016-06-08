@@ -11,12 +11,12 @@ object TokenizerGenerator {
         return result
     }
 
-    fun generate(grammarName: String, tokens: Map<String, String>, folder:String = "myGen/",
+    fun generate(grammarName: String, tokens: Map<String, String>, folder:String = "myGen",
                  packageName:String = folder) {
         val className = "${grammarName}Tokenizer"
-        val file = File("$folder$className.kt")
+        val file = File("$folder/$className.kt")
         val result = StringBuilder()
-        val indenter = Utils.Indenter(result)
+        val indenter = GeneratorUtils.Indenter(result)
         indenter.writeln("package $packageName")
         indenter.writeln("import im.kirillt.parsergenerator.base.BaseTokenizer")
         indenter.writeln("import im.kirillt.parsergenerator.base.Token")
@@ -27,7 +27,7 @@ object TokenizerGenerator {
         indenter.indented {
             indenter.writeln("fun tokens(): Map<String, String> {")
             indenter.indented {
-                Utils.generateMapStringStringSource(tokens, "tokens").forEach { indenter.writeln(it) }
+                GeneratorUtils.generateMapStringStringSource(tokens, "tokens").forEach { indenter.writeln(it) }
                 indenter.writeln("return tokens")
             }
             indenter.writeln("}")
