@@ -1,4 +1,4 @@
-package im.kirillt.parsergenerator
+package im.kirillt.parsergenerator.base
 
 import java.util.regex.Pattern
 
@@ -6,14 +6,14 @@ open class Token(val name: String, val text: String)
 
 class EOF(): Token("EOF", "")
 
-class Tokenizer(val tokens: Map<String, String>, val input: String) {
+open class BaseTokenizer(val tokens: Map<String, String>, val input: String) {
     private val patterns = tokens.map { Pair(Pattern.compile(it.value), it.key) }.toMap()
     var curPos = 0
         private set
     var curToken: Token? = null
         private set
 
-    fun nextToken(): Token {
+    open fun nextToken(): Token {
         if (curPos == input.length) {
             curToken = EOF()
             return curToken as Token
