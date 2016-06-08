@@ -1,10 +1,15 @@
 package im.kirillt.parsergenerator
 
+import java.io.File
 import java.util.*
+
+import im.kirillt.parsergenerator.GeneratorUtils.Indenter
+import im.kirillt.parsergenerator.GeneratorUtils.contextClassName
+import im.kirillt.parsergenerator.base.BaseRuleContext
 
 object ParserGenerator {
     open class RuleItem(val name: String) {
-        override fun equals(other: Any?) = toString().equals(other.toString())
+        override fun equals(other: Any?) = other is RuleItem && toString().equals(other.toString())
 
         override fun hashCode() = toString().hashCode()
 
@@ -14,20 +19,50 @@ object ParserGenerator {
     class Terminal(n: String) : RuleItem(n) {
         override fun toString() = "Terminal(${super.name})"
     }
+
     class NonTerminal(n: String) : RuleItem(n) {
         override fun toString() = "NonTerminal(${super.name})"
     }
 
     data class Variable(val name: String, val type: String)
 
-    val rules = mutableMapOf<NonTerminal, MutableList<Derivation>>()
+    data class RuleParams(val argument: Variable? = null, val returns: Variable? = null)
 
-    class Derivation(val from: NonTerminal, val children: List<RuleItem>, val sourceCode: String? = null) {
-        public fun generateMethod(): String {
-            return ""
+    val rules = mutableMapOf<NonTerminal, MutableList<Derivation>>()
+    val ruleParams = mutableMapOf<String, RuleParams>()
+
+    class Derivation(val from: NonTerminal, val children: List<RuleItem>, val sourceCode: String = "") {
+        fun generateMethod(number: Int): String {
+            val result = StringBuilder()
+            val indenter = Indenter(result)
+            indenter.writeln("fun ${from.name}_$number() {")
+            indenter.indented {
+                indenter.writeln("var __text = \"\"")
+                for ((index, child) in children.withIndex()) {
+                    if (child is NonTerminal) {
+                        val typeName = contextClassName(child.name)
+                        val varName = "__"+child.name+"_"+index
+                        val funCall = child.name+"()"
+                        indenter.writeln("$typeName $varName = $funCall")
+                        indenter.writeln("__text += $varName.text")
+                    } else if (child is Terminal) {
+                        indenter.writeln("if (tokenizer.curToken().name != \"${child.name}\" {")
+                        indenter.indented {
+                            indenter.writeln("throw Exception(\"expected token '${child.name}', but get 'tokenizer.curToken().name'\")")
+                        }
+                        indenter.writeln("}")
+                        indenter.writeln("__text += tokenizer.curToken().text")
+                        indenter.writeln("tokenizer.nextToken()")
+                    }
+                }
+                indenter.writeln(sourceCode)
+                indenter.writeln("return ${contextClassName(from.name)}(text = __text)")
+            }
+            indenter.writeln("}")
+            return result.toString()
         }
 
-        public fun first(): List<Terminal> {
+        fun first(): List<Terminal> {
             val first = children.first()
             if (first is Terminal)
                 return listOf(first);
@@ -50,33 +85,38 @@ object ParserGenerator {
 
     @JvmStatic
     fun addToken(string: String, name: String = ""): String {
+        var fixed = string
+        if (fixed.startsWith("'"))
+            fixed = fixed.drop(1)
+        if (fixed.endsWith("'"))
+            fixed = fixed.dropLast(1)
         if (name.isEmpty()) {
             for (i in tokens) {
-                if (i.value.equals(string))
+                if (i.value.equals(fixed))
                     return i.key
             }
             unnamedTokensCount++
             val key = "_T_" + unnamedTokensCount;
-            tokens.put(key, string)
+            tokens.put(key, fixed)
             return key
         }
         if (tokens.containsKey(name))
             throw Exception("already have token with name '$name'")
 
-        tokens.put(name, string)
+        tokens.put(name, fixed)
         return name
     }
 
     @JvmStatic
-    //add eps rule if left is empty
-    fun addRule(nonTermName: String, left: ArrayList<RuleItem>) {
+            //add eps rule if left is empty
+    fun addRule(nonTermName: String, left: ArrayList<RuleItem>, action: String) {
         val from = NonTerminal(nonTermName)
         nonTerminals.add(from)
         val children = when (left.isEmpty()) {
             true -> listOf(EPS)
             false -> left.toList()
         }
-        rules.getOrPut(from, { mutableListOf<Derivation>() }).add(Derivation(from, children))
+        rules.getOrPut(from, { mutableListOf<Derivation>() }).add(Derivation(from, children, action))
     }
 
     private fun clean() {
@@ -89,7 +129,7 @@ object ParserGenerator {
         }
     }
 
-    public fun constructFirstAndFollow() {
+    fun constructFirstAndFollow() {
         fun first(alpha: RuleItem) = when (alpha) {
             is NonTerminal -> FIRST[alpha]!!
             is Terminal -> mutableSetOf(alpha)
@@ -136,6 +176,24 @@ object ParserGenerator {
         }
     }
 
+    fun generateTokenizer() {
+        TokenizerGenerator.generate(grammarName, tokens)
+    }
+
+    fun generateContextClasses(ruleAttrs: Map<String, RuleParams>): List<String> {
+        val result = mutableListOf<String>()
+        for ((rule, attr) in ruleAttrs) {
+            var arg = ""
+            if (attr.argument != null)
+                arg = "val ${attr.argument.name}: ${attr.argument.type}, "
+            result += " class ${contextClassName(rule)}(${arg}text: String) : BaseRuleContext(text)"
+        }
+        return result
+    }
+
+    fun generateMethod() {
+
+    }
 
     private fun reachable(): MutableSet<NonTerminal> {
         val rv = mutableSetOf<NonTerminal>()
