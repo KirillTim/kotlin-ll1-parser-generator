@@ -1,7 +1,7 @@
 grammar expr;
-start : e {var i = 0; i++; println("in start, i="+i);};
+start : e[10] {var i = 0; i++; println("in start, i="+i);};
 
-e : t eP;
+e[int count] returns [int other]: t eP {println("get count="+count);};
 eP : '\+' t eP | ;
 t : f tP;
 tP : MUL f tP | ;

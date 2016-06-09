@@ -28,11 +28,13 @@ ruleHead returns [String name]
     ;
 
 ruleParameterList[String ruleName]
-    : (ruleParametr)? ('returns' ruleParametr)? //('locals' ruleParametr)?
+    : (ruleParametr[true])? ('returns' ruleParametr[false])? //('locals' ruleParametr)?
     ;
 
-ruleParametr
-    : '[' type=ID name=ID ']'
+ruleParametr[boolean arg]
+    : '[' type=ID name=ID ']' {
+        Utils.p("type="+$type.text);
+    }
     ;
 
 ruleChild[String ruleName] locals[ArrayList<RuleItem> children]
@@ -40,21 +42,31 @@ ruleChild[String ruleName] locals[ArrayList<RuleItem> children]
     $children = new ArrayList<RuleItem>();
     Utils.p("rule name:"+$ruleName);
     String rulAection = "";
+    String ruleArg = "";
 }
 @after {
     ParserGenerator.addRule($ruleName, $children, rulAection);
+    Utils.p("ruleArg= "+ruleArg);
 }
     : (ruleChildOptions {$children.add($ruleChildOptions.item);})* (action {rulAection = $action.text;})?
     ;
 
 ruleChildOptions returns[RuleItem item]
-    : ruleKeyword {$item = new NonTerminal($ruleKeyword.text); Utils.p("rule");}
+    : ruleKeyword {$item = new NonTerminal($ruleKeyword.text); Utils.p("rule");} //('[' ruleArgument ']' {ruleArg = $ruleArgument.text;})?
     | tokenKeyword {$item = new Terminal($tokenKeyword.text); Utils.p("token");}
     | stringLiteral {
                         String name = ParserGenerator.addToken($stringLiteral.text, "");
                         $item = new Terminal(name);
                         Utils.p("literal");
                     }
+    ;
+
+ruleArgument
+    : RULE_ARGUMENT
+    ;
+
+RULE_ARGUMENT
+    : ~']'
     ;
 
 action

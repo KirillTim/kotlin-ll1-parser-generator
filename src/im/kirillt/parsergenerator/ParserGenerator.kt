@@ -30,7 +30,9 @@ object ParserGenerator {
     data class RuleParams(val argument: Variable? = null, val returns: Variable? = null)
 
     val rules = mutableMapOf<NonTerminal, MutableList<Derivation>>()
-    val ruleParams = mutableMapOf<String, RuleParams>()
+    val ruleArgs = mutableMapOf<String, Variable>()
+    val ruleReturns = mutableMapOf<String, Variable>()
+
 
     class Derivation(val from: NonTerminal, val children: List<RuleItem>, val sourceCode: String = "") {
         fun generateBlock(number: Int): String {
@@ -111,7 +113,7 @@ object ParserGenerator {
 
     @JvmStatic
             //add eps rule if left is empty
-    fun addRule(nonTermName: String, left: ArrayList<RuleItem>, action: String) {
+    fun addRule(nonTermName: String, left: ArrayList<RuleItem>, action: String, ruleArg: String) {
         val from = NonTerminal(nonTermName)
         nonTerminals.add(from)
         val children = when (left.isEmpty()) {
@@ -182,13 +184,14 @@ object ParserGenerator {
         TokenizerGenerator.generate(grammarName, tokens)
     }
 
-    fun generateContextClasses(ruleAttrs: Map<String, RuleParams>): List<String> {
+    fun generateContextClasses(): List<String> {
         val result = mutableListOf<String>()
-        for ((rule, attr) in ruleAttrs) {
+        for (rule in rules.keys) {
             var arg = ""
-            if (attr.argument != null)
-                arg = "val ${attr.argument.name}: ${attr.argument.type}, "
-            result += " class ${contextClassName(rule)}(${arg}text: String = \"\") : BaseRuleContext(text)"
+            val v = ruleReturns[rule.name]
+            if (v != null)
+                arg = "val ${v.name}: ${v.type}, "
+            result += " class ${contextClassName(rule.name)}(${arg}text: String = \"\") : BaseRuleContext(text)"
         }
         return result
     }
@@ -196,7 +199,11 @@ object ParserGenerator {
     fun generateMethod(rule: NonTerminal, derivations: MutableList<Derivation>): String {
         val result = StringBuilder()
         val indenter = GeneratorUtils.Indenter(result)
-        indenter.writeln("fun ${rule.name}(): ${GeneratorUtils.contextClassName(rule.name)}{")
+        var arg = ""
+        val v = ruleArgs[rule.name]
+        if (v != null)
+            arg += v.name+": " +v.type
+        indenter.writeln("fun ${rule.name}($arg): ${GeneratorUtils.contextClassName(rule.name)}{")
         indenter.indented {
             var epsRuleInd = -1
             for ((ind,option) in derivations.withIndex()) {
@@ -232,12 +239,9 @@ object ParserGenerator {
         val className = "${grammarName}Parser"
         val file = File("$folder/$className.kt")
         var str = ""
-        str = "package $packageName\nimport im.kirillt.parsergenerator.base.BaseRuleContext\n"+
-                "import $folder.Tokenizer\n";
+        str = "package $packageName\nimport im.kirillt.parsergenerator.base.BaseRuleContext\nimport $folder.Tokenizer\n";
         constructFirstAndFollow()
-        for (i in rules)
-            ruleParams[i.key.name] = RuleParams()
-        generateContextClasses(ruleParams).forEach { str += it+"\n" }
+        generateContextClasses().forEach { str += it+"\n" }
         str += "class $className(val tokenizer: ${grammarName}Tokenizer) {\n"
         str += "init {tokenizer.nextToken()}\n"
         for ((rule, derivations) in rules) {
