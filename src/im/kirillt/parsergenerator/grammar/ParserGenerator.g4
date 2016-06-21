@@ -5,7 +5,10 @@ import im.kirillt.parsergenerator.ParserGenerator;
 import im.kirillt.parsergenerator.ParserGenerator.NonTerminal;
 import im.kirillt.parsergenerator.ParserGenerator.Terminal;
 import im.kirillt.parsergenerator.ParserGenerator.RuleItem;
+import im.kirillt.parsergenerator.ParserGenerator.RuleChild;
+import im.kirillt.parsergenerator.ParserGenerator.Variable;
 }
+
 input
     : grammaHeader line*
     ;
@@ -16,7 +19,7 @@ line
     ;
 
 grammaHeader
-    : 'grammar' grmrName ';' {ParserGenerator.grammarName = $grmrName.text;}
+    : 'grammar' id ';' {ParserGenerator.grammarName = $id.text;}
     ;
 
 ruleR :
@@ -24,54 +27,74 @@ ruleR :
     ;
 
 ruleHead returns [String name]
-    : ruleKeyword ruleParameterList[$ruleKeyword.text] {$name = $ruleKeyword.text;}
+    : RULE_KEYWORD ruleParameterList[$RULE_KEYWORD.text] {$name = $RULE_KEYWORD.text;}
     ;
 
 ruleParameterList[String ruleName]
-    : (ruleParametr[true])? ('returns' ruleParametr[false])? //('locals' ruleParametr)?
+    : (ruleParametr{ParserGenerator.addRuleArg($ruleName, new Variable($ruleParametr.text, $ruleParametr.text));})?
+        ('returns' ruleParametr {ParserGenerator.addRuleReturns($ruleName, new Variable($ruleParametr.text, $ruleParametr.text));})?
     ;
-
-ruleParametr[boolean arg]
-    : '[' type=ID name=ID ']' {
-        Utils.p("type="+$type.text);
+ruleParametr returns[String type, String name]
+    : '[' type_str=id name_str=id ']' {
+        $type = $type_str.text;
+        $name = $name_str.text;
+        Utils.p("type="+$type_str.text);
     }
     ;
 
-ruleChild[String ruleName] locals[ArrayList<RuleItem> children]
+
+ruleChild[String ruleName] locals[ArrayList<RuleChild> children]
 @init {
-    $children = new ArrayList<RuleItem>();
+    $children = new ArrayList<RuleChild>();
     Utils.p("rule name:"+$ruleName);
-    String rulAection = "";
+    String ruleAction = "";
     String ruleArg = "";
 }
 @after {
-    ParserGenerator.addRule($ruleName, $children, rulAection);
-    Utils.p("ruleArg= "+ruleArg);
+    ParserGenerator.addRule($ruleName, $children, ruleAction, "");
 }
-    : (ruleChildOptions {$children.add($ruleChildOptions.item);})* (action {rulAection = $action.text;})?
+    : (ruleChildOptions {$children.add($ruleChildOptions.item);})* (ACTION {ruleAction = $ACTION.text;})?
     ;
 
-ruleChildOptions returns[RuleItem item]
-    : ruleKeyword {$item = new NonTerminal($ruleKeyword.text); Utils.p("rule");} //('[' ruleArgument ']' {ruleArg = $ruleArgument.text;})?
-    | tokenKeyword {$item = new Terminal($tokenKeyword.text); Utils.p("token");}
-    | stringLiteral {
-                        String name = ParserGenerator.addToken($stringLiteral.text, "");
-                        $item = new Terminal(name);
+ruleChildOptions returns[RuleChild item]
+    : ruleOption { $item = $ruleOption.item; Utils.p("rule");}
+    | TOKEN_KEYWORD {$item = new RuleChild(new Terminal($TOKEN_KEYWORD.text), ""); Utils.p("token");}
+    | STRING_LITERAL {
+                        String name = ParserGenerator.addToken($STRING_LITERAL.text, "");
+                        $item = new RuleChild(new Terminal(name), "");
                         Utils.p("literal");
                     }
     ;
 
-ruleArgument
-    : RULE_ARGUMENT
+
+ruleOption returns[RuleChild item]
+@init {
+    //$item = new RuleChild();
+}
+    : (RULE_KEYWORD{$item = new RuleChild(new NonTerminal($RULE_KEYWORD.text), "");})
+                ('[' RULE_ARGUMENT ']' {$item.setArg($RULE_ARGUMENT.text);})?
     ;
 
+token
+    : TOKEN_KEYWORD ':' STRING_LITERAL + ';'
+    {
+        ParserGenerator.addToken($STRING_LITERAL.text, $TOKEN_KEYWORD.text);
+        Utils.p("token add");
+    }
+    ;
+
+id : RULE_KEYWORD | TOKEN_KEYWORD;
+
+RULE_KEYWORD: LOWCASE (LOWCASE|CAPITAL| '_' | DIGIT)* ;
+TOKEN_KEYWORD : CAPITAL (LOWCASE|CAPITAL| '_' | DIGIT)* ;
 RULE_ARGUMENT
-    : ~']'
+    : ('$' (LOWCASE|CAPITAL|'_') (LOWCASE|CAPITAL|'_'|DIGIT)* ('.' (LOWCASE|CAPITAL|'_') (LOWCASE|CAPITAL|'_'|DIGIT)*)*)
+    | DIGIT+
     ;
 
-action
-    : ACTION
-    ;
+CAPITAL:    'A'..'Z';
+LOWCASE:    'a'..'z';
+DIGIT:      [0-9];
 
 ACTION
 	:	'{'
@@ -82,35 +105,6 @@ ACTION
 		)*?
 		('}'|EOF)
 	;
-
-token
-    : tokenKeyword ':' stringLiteral + ';'
-    {
-        ParserGenerator.addToken($stringLiteral.text, $tokenKeyword.text);
-    }
-    ;
-
-ruleKeyword
-    : RULE_KEYWORD
-    ;
-
-tokenKeyword
-    : TOKEN_KEYWORD
-    ;
-
-grmrName
-    : ID
-    ;
-
-TOKEN_KEYWORD: ('A'..'Z') ('A'..'Z'|'_')*;
-
-RULE_KEYWORD: ('a'..'z') ('a'..'z'|'A'..'Z'|'0'..'9'|'_'|'?')*;
-
-ID: ('a'..'z'|'A'..'Z'|'_') ('a'..'z'|'A'..'Z'|'0'..'9'|'_'|'?')*;
-
-stringLiteral
-    : STRING_LITERAL
-    ;
 
 STRING_LITERAL
    : '\'' ('\'\'' | ~ ('\''))* '\''
