@@ -1,14 +1,28 @@
-grammar expr;
-start : e[10] {var i = 0; i++; println("in start, i="+i);};
+grammar test;
 
-e[int count] returns [int other]: t eP {println("get count="+count);};
-eP : '\+' t eP | ;
-t : f tP;
-tP : MUL f tP | ;
-f : NUM | '\(' e '\)' ;
+start returns [v: Int]
+    : t e { $v = $t.v + $e.v; println("start: t="+$t.v);}
+    ;
 
-PLUS: '\+' ;
-MUL: '\*' ;
-LB: '\(';
-RB: '\)';
-NUM: '[0-9]+';
+e returns [v: Int]
+    : '\+' t e { $v = $t.v + $e.v; }
+    | { $v = 0; }
+    ;
+
+t returns [v: Int]
+    : f d { $v = $f.v * $d.v; println("in t");}
+    ;
+
+d returns [v: Int]
+    : '\*' f d { $v = $f.v * $d.v; }
+    | { $v = 1; println("EPS in d"); }
+    ;
+
+f returns [v: Int]
+    : num { $v = $num.text.toInt(); println("get num="+$v);}
+    | '\(' start '\)' { $v = $start.v; }
+    ;
+
+num : NUM;
+
+NUM : '[0-9]+';

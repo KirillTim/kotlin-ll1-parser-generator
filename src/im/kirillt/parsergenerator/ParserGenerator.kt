@@ -29,49 +29,75 @@ object ParserGenerator {
 
     data class RuleParams(val argument: Variable? = null, val returns: Variable? = null)
 
+    data class RuleChild(var item: RuleItem, var arg: String)
+
     val rules = mutableMapOf<NonTerminal, MutableList<Derivation>>()
     val ruleArgs = mutableMapOf<String, Variable>()
     val ruleReturns = mutableMapOf<String, Variable>()
 
 
-    class Derivation(val from: NonTerminal, val children: List<RuleItem>, val sourceCode: String = "") {
-        fun generateBlock(number: Int): String {
-            val result = StringBuilder()
-            val indenter = Indenter(result)
-            //indenter.writeln("fun ${from.name}_$number() {")
+    @JvmStatic
+    fun addRuleArg(rule: String, v: Variable) = ruleArgs.put(rule, v)
+
+    @JvmStatic
+    fun addRuleReturns(rule: String, v: Variable) = ruleReturns.put(rule, v)
+
+    class Derivation(val from: NonTerminal, val children: List<RuleChild>, val sourceCode: String = "") {
+
+        fun generateCodeBlock(check: Boolean = true): String {
+            val resultCtxName = "__resultCtx"
+
+            val indenter = Indenter(StringBuilder())
             indenter.indented {
-                indenter.writeln("var __text = \"\"")
-                for ((index, child) in children.withIndex()) {
+                indenter.writeln("val $resultCtxName = ${contextClassName(from.name)}()")
+                for ((index, data) in children.withIndex()) {
+                    val (child, args) = data
                     if (child is NonTerminal) {
-                        val typeName = contextClassName(child.name)
-                        val varName = "__" + child.name + "_" + index
-                        val funCall = child.name + "()"
-                        indenter.writeln("var $varName = $funCall")
-                        indenter.writeln("__text += $varName.text")
+                        val varName = "__" + child.name
+                        val funCall = child.name
+                        indenter.writeln("val $varName = $funCall(${replacePlaceHolders(from, args)})")
+                        indenter.writeln("$resultCtxName.text += $varName.text")
                     } else if (child is Terminal) {
-                        indenter.writeln("if (tokenizer.curToken!!.name != \"${child.name}\") {")
-                        indenter.indented {
-                            indenter.writeln("throw Exception(\"expected token '${child.name}', but get \"+tokenizer.curToken!!.name)")
+                        if (check) {
+                            indenter.writeln("if (tokenizer.curToken!!.name != \"${child.name}\") {")
+                            indenter.indented {
+                                indenter.writeln("throw Exception(\"expected token '${child.name}', but get \"+tokenizer.curToken!!.name)")
+                            }
+                            indenter.writeln("}")
+                            indenter.writeln("$resultCtxName.text += tokenizer.curToken!!.text")
+                            indenter.writeln("tokenizer.nextToken()")
                         }
-                        indenter.writeln("}")
-                        indenter.writeln("__text += tokenizer.curToken!!.text")
-                        indenter.writeln("tokenizer.nextToken()")
                     }
                 }
-                val action = sourceCode.dropWhile { it == '{' }.dropLastWhile { it == '}' }
+                val action = replacePlaceHolders(from, sourceCode.dropWhile { it == '{' }.dropLastWhile { it == '}' })
                 indenter.writeln(action)
-                indenter.writeln("return ${contextClassName(from.name)}(text = __text)")
+                indenter.writeln("return $resultCtxName")
             }
             indenter.writeln("}")
-            return result.toString()
+            return indenter.result.toString()
         }
 
+
         fun first(): List<Terminal> {
-            val first = children.first()
+            val first = children.first().item
             if (first is Terminal)
                 return listOf(first);
             else
                 return rules[first]!!.flatMap { it.first() }
+        }
+
+        companion object {
+            fun replacePlaceHolders(from: NonTerminal, code: String, resultCtxName : String = "__resultCtx"): String {
+                var result = code
+                val ruleArgName = ruleArgs[from.name]?.name
+                if (ruleArgName != null)
+                    result = code.replace("$$ruleArgName", "__$ruleArgName")
+                val ruleReturns = ruleReturns[from.name]?.name
+                if (ruleReturns != null)
+                    result = result.replace("$$ruleReturns", "$resultCtxName.$ruleReturns")
+                result = result.replace("$", "__")
+                return result
+            }
         }
     }
 
@@ -113,11 +139,11 @@ object ParserGenerator {
 
     @JvmStatic
             //add eps rule if left is empty
-    fun addRule(nonTermName: String, left: ArrayList<RuleItem>, action: String, ruleArg: String) {
+    fun addRule(nonTermName: String, left: ArrayList<RuleChild>, action: String, ruleArg: String) {
         val from = NonTerminal(nonTermName)
         nonTerminals.add(from)
         val children = when (left.isEmpty()) {
-            true -> listOf(EPS)
+            true -> listOf(RuleChild(EPS, ""))
             false -> left.toList()
         }
         rules.getOrPut(from, { mutableListOf<Derivation>() }).add(Derivation(from, children, action))
@@ -146,7 +172,7 @@ object ParserGenerator {
             val oldSize = FIRST.map { it.value.size }.sum()
             rules.forEach {
                 for (alternative in it.value) {
-                    val add = first(alternative.children.first())
+                    val add = first(alternative.children.first().item)
                     FIRST[it.key]!! += add
                 }
             }
@@ -162,13 +188,13 @@ object ParserGenerator {
                 val A = it.key
                 for (alternative in it.value) {
                     for (i in alternative.children.indices) {
-                        val B = alternative.children[i]
+                        val B = alternative.children[i].item
                         if (B !is NonTerminal)
                             continue
                         if (i == alternative.children.size - 1)
                             FOLLOW[B]!! += FOLLOW[A]!!
                         else {
-                            val gamma = alternative.children[i + 1]
+                            val gamma = alternative.children[i + 1].item
                             FOLLOW[B]!! += first(gamma) - EPS
                             if (first(gamma).contains(EPS))
                                 FOLLOW[B]!! += FOLLOW[A]!!
@@ -189,8 +215,15 @@ object ParserGenerator {
         for (rule in rules.keys) {
             var arg = ""
             val v = ruleReturns[rule.name]
-            if (v != null)
-                arg = "val ${v.name}: ${v.type}, "
+            if (v != null) {
+                val defVal = when(v.type) {
+                    "Int" -> "0"
+                    "Double" -> "0.0"
+                    "String" -> ""
+                    else -> ""
+                }
+                arg = "var ${v.name}: ${v.type} = $defVal, "
+            }
             result += " class ${contextClassName(rule.name)}(${arg}text: String = \"\") : BaseRuleContext(text)"
         }
         return result
@@ -202,13 +235,14 @@ object ParserGenerator {
         var arg = ""
         val v = ruleArgs[rule.name]
         if (v != null)
-            arg += v.name+": " +v.type
+            arg += "__${v.name} : ${v.type}"
         indenter.writeln("fun ${rule.name}($arg): ${GeneratorUtils.contextClassName(rule.name)}{")
         indenter.indented {
             var epsRuleInd = -1
-            for ((ind,option) in derivations.withIndex()) {
-                if (option.children.size == 1 && option.children.first() == EPS) {
+            for ((ind, option) in derivations.withIndex()) {
+                if (option.children.size == 1 && option.children.first().item == EPS) {
                     epsRuleInd = ind
+                    //indenter.writeln(Derivation.replacePlaceHolders(rule, option.sourceCode.dropWhile { it == '{' }.dropLastWhile { it == '}' }))
                     continue;
                 }
                 val sj = StringJoiner(" || ", "if (", ") {")
@@ -216,7 +250,7 @@ object ParserGenerator {
                     sj.add("tokenizer.curToken!!.name == \"${tok.name}\"")
                 }
                 indenter.writeln(sj.toString())
-                indenter.writeln(option.generateBlock(ind))
+                indenter.writeln(option.generateCodeBlock())
             }
             if (epsRuleInd != -1) {
                 indenter.writeln("//check FOLLOW")
@@ -225,7 +259,8 @@ object ParserGenerator {
                     sj.add("tokenizer.curToken!!.name == \"${tok.name}\"")
                 indenter.writeln(sj.toString())
                 indenter.indented {
-                    indenter.writeln("return ${GeneratorUtils.contextClassName(rule.name)}()")
+                    indenter.writeln(derivations[epsRuleInd].generateCodeBlock(false).dropLast(2))
+                    //indenter.writeln("return ${GeneratorUtils.contextClassName(rule.name)}()")
                 }
                 indenter.writeln("}")
             }
@@ -235,13 +270,13 @@ object ParserGenerator {
         return result.toString()
     }
 
-    fun generateParser (folder:String = "myGen",  packageName:String = folder) {
+    fun generateParser(folder: String = "myGen", packageName: String = folder) {
         val className = "${grammarName}Parser"
         val file = File("$folder/$className.kt")
         var str = ""
-        str = "package $packageName\nimport im.kirillt.parsergenerator.base.BaseRuleContext\nimport $folder.Tokenizer\n";
+        str = "package $packageName\nimport im.kirillt.parsergenerator.base.BaseRuleContext\nimport $folder.${grammarName}Tokenizer\n";
         constructFirstAndFollow()
-        generateContextClasses().forEach { str += it+"\n" }
+        generateContextClasses().forEach { str += it + "\n" }
         str += "class $className(val tokenizer: ${grammarName}Tokenizer) {\n"
         str += "init {tokenizer.nextToken()}\n"
         for ((rule, derivations) in rules) {
@@ -259,7 +294,7 @@ object ParserGenerator {
             rules.forEach {
                 if (rv.contains(it.key)) {
                     it.value.forEach {
-                        it.children.forEach { if (it is NonTerminal) rv.add(it) }
+                        it.children.forEach { if (it.item is NonTerminal) rv.add(it.item as NonTerminal) }
                     }
                 }
             }

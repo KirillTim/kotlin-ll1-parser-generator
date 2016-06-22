@@ -31,11 +31,11 @@ ruleHead returns [String name]
     ;
 
 ruleParameterList[String ruleName]
-    : (ruleParametr{ParserGenerator.addRuleArg($ruleName, new Variable($ruleParametr.text, $ruleParametr.text));})?
-        ('returns' ruleParametr {ParserGenerator.addRuleReturns($ruleName, new Variable($ruleParametr.text, $ruleParametr.text));})?
+    : (ruleParametr{ParserGenerator.addRuleArg($ruleName, new Variable($ruleParametr.name, $ruleParametr.type));})?
+        ('returns' ruleParametr {ParserGenerator.addRuleReturns($ruleName, new Variable($ruleParametr.name, $ruleParametr.type));})?
     ;
 ruleParametr returns[String type, String name]
-    : '[' type_str=id name_str=id ']' {
+    : '[' name_str=id ':' type_str=id ']' {
         $type = $type_str.text;
         $name = $name_str.text;
         Utils.p("type="+$type_str.text);

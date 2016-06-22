@@ -16,15 +16,15 @@ fun main(args:Array<String>) {
     val tree = parser.input()
     ParserGenerator.generateTokenizer()
     ParserGenerator.generateParser()
-//    for ((rule, direvs) in ParserGenerator.rules) {
-//        println("Rule: $rule")
-//        /*for ((ind, d) in direvs.withIndex()) {
-//            println(ind.toString()+" : source")
-//            println(d.generateBlock(ind))
-//            println("---------------------")
-//
-//        }*/
-//        println(ParserGenerator.generateMethod(rule, direvs))
-//        println("---------------------")
-//    }
+    for ((rule, direvs) in ParserGenerator.rules) {
+        println("Rule: $rule")
+        /*for ((ind, d) in direvs.withIndex()) {
+            println(ind.toString()+" : source")
+            println(d.generateBlock(ind))
+            println("---------------------")
+
+        }*/
+        println(ParserGenerator.generateMethod(rule, direvs))
+        println("---------------------")
+    }
 }
