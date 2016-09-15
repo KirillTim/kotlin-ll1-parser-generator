@@ -8,6 +8,15 @@ import org.antlr.v4.runtime.CommonTokenStream
 import java.io.File
 
 fun main(args:Array<String>) {
+    /*val input = File("data/simple.g4").readText()
+    val stream = ANTLRInputStream(input)
+    val lexer = ParserGeneratorLexer(stream)
+    val tokens = CommonTokenStream(lexer)
+    val parser = ParserGeneratorParser(tokens)
+    val tree = parser.input()
+    ParserGenerator.generateTokenizer()
+    ParserGenerator.generateParser()*/
+    //val input = File("data/test.g4").readText()
     val input = File("data/test.g4").readText()
     val stream = ANTLRInputStream(input)
     val lexer = ParserGeneratorLexer(stream)
@@ -16,6 +25,7 @@ fun main(args:Array<String>) {
     val tree = parser.input()
     ParserGenerator.generateTokenizer()
     ParserGenerator.generateParser()
+
     for ((rule, direvs) in ParserGenerator.rules) {
         println("Rule: $rule")
         /*for ((ind, d) in direvs.withIndex()) {

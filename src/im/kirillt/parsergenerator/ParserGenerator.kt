@@ -1,12 +1,9 @@
 package im.kirillt.parsergenerator
 
-import java.io.File
-import java.util.*
-
 import im.kirillt.parsergenerator.GeneratorUtils.Indenter
 import im.kirillt.parsergenerator.GeneratorUtils.contextClassName
-import im.kirillt.parsergenerator.base.BaseRuleContext
-import im.kirillt.parsergenerator.base.EOF
+import java.io.File
+import java.util.*
 
 object ParserGenerator {
     open class RuleItem(val name: String) {
@@ -87,11 +84,13 @@ object ParserGenerator {
         }
 
         companion object {
-            fun replacePlaceHolders(from: NonTerminal, code: String, resultCtxName : String = "__resultCtx"): String {
+            fun replacePlaceHolders(from: NonTerminal, code: String, resultCtxName: String = "__resultCtx"): String {
                 var result = code
                 val ruleArgName = ruleArgs[from.name]?.name
-                if (ruleArgName != null)
+                if (ruleArgName != null) {
+                    //result = code.replace("$$ruleArgName.")
                     result = code.replace("$$ruleArgName", "__$ruleArgName")
+                }
                 val ruleReturns = ruleReturns[from.name]?.name
                 if (ruleReturns != null)
                     result = result.replace("$$ruleReturns", "$resultCtxName.$ruleReturns")
@@ -121,25 +120,25 @@ object ParserGenerator {
         if (fixed.endsWith("'"))
             fixed = fixed.dropLast(1)
         if (name.isEmpty()) {
-            for (i in tokens) {
-                if (i.value.equals(fixed))
-                    return i.key
+            for ((name, token_regexp) in tokens) {
+                if (token_regexp.equals(fixed))
+                    return name
             }
             unnamedTokensCount++
             val key = "_T_" + unnamedTokensCount;
-            tokens.put(key, fixed)
+            tokens[key] = fixed
             return key
         }
         if (tokens.containsKey(name))
             throw Exception("already have token with name '$name'")
 
-        tokens.put(name, fixed)
+        tokens[name] = fixed
         return name
     }
 
     @JvmStatic
             //add eps rule if left is empty
-    fun addRule(nonTermName: String, left: ArrayList<RuleChild>, action: String, ruleArg: String) {
+    fun addRule(nonTermName: String, left: ArrayList<RuleChild>, action: String) {
         val from = NonTerminal(nonTermName)
         nonTerminals.add(from)
         val children = when (left.isEmpty()) {
@@ -213,25 +212,16 @@ object ParserGenerator {
     fun generateContextClasses(): List<String> {
         val result = mutableListOf<String>()
         for (rule in rules.keys) {
-            var arg = ""
-            val v = ruleReturns[rule.name]
-            if (v != null) {
-                val defVal = when(v.type) {
-                    "Int" -> "0"
-                    "Double" -> "0.0"
-                    "String" -> ""
-                    else -> ""
-                }
-                arg = "var ${v.name}: ${v.type} = $defVal, "
-            }
-            result += " class ${contextClassName(rule.name)}(${arg}text: String = \"\") : BaseRuleContext(text)"
+            val ret = ruleReturns[rule.name]
+            val arg = if (ret != null) "var ${ret.name}: ${ret.type}? = null, " else ""
+            result += "class ${contextClassName(rule.name)}(${arg}text: String = \"\") : BaseRuleContext(text)"
         }
         return result
     }
 
+
     fun generateMethod(rule: NonTerminal, derivations: MutableList<Derivation>): String {
-        val result = StringBuilder()
-        val indenter = GeneratorUtils.Indenter(result)
+        val indenter = GeneratorUtils.Indenter(StringBuilder())
         var arg = ""
         val v = ruleArgs[rule.name]
         if (v != null)
@@ -267,14 +257,13 @@ object ParserGenerator {
             indenter.writeln("throw Exception(\"Unexpected token: \"+tokenizer.curToken!!.name)")
         }
         indenter.writeln("}")
-        return result.toString()
+        return indenter.result.toString()
     }
 
     fun generateParser(folder: String = "myGen", packageName: String = folder) {
         val className = "${grammarName}Parser"
         val file = File("$folder/$className.kt")
-        var str = ""
-        str = "package $packageName\nimport im.kirillt.parsergenerator.base.BaseRuleContext\nimport $folder.${grammarName}Tokenizer\n";
+        var str = "package $packageName\nimport im.kirillt.parsergenerator.base.BaseRuleContext\nimport $folder.${grammarName}Tokenizer\n"
         constructFirstAndFollow()
         generateContextClasses().forEach { str += it + "\n" }
         str += "class $className(val tokenizer: ${grammarName}Tokenizer) {\n"

@@ -3,8 +3,8 @@ package im.kirillt.parsergenerator
 import myGen.*
 
 fun main(args: Array<String>) {
-    val tokenizer = testTokenizer("10*4+1*(2+3)")
-    val parser = testParser(tokenizer)
-    println(parser.start().v)
+    val parser = testParser(testTokenizer("(2 + 2) * 2"))
+    val v = parser.start().v
+    println("res = $v")
 }
 

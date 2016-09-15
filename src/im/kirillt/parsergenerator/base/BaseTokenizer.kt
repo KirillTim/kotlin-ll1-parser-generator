@@ -6,7 +6,7 @@ open class Token(val name: String, val text: String)
 
 class EOF(): Token("$", "")
 
-open class BaseTokenizer(val tokens: Map<String, String>, val input: String) {
+open class BaseTokenizer(tokens: Map<String, String>, val input: String) {
     private val patterns = tokens.map { Pair(Pattern.compile(it.value), it.key) }.toMap()
     var curPos = 0
         private set
@@ -18,6 +18,9 @@ open class BaseTokenizer(val tokens: Map<String, String>, val input: String) {
             curToken = EOF()
             return curToken as Token
         }
+        while (curPos < input.length && isBlank(input[curPos]))
+            curPos ++
+
         var longestToken = Token("", "")
         for ((pattern, name) in patterns) {
             val matcher = pattern.matcher(input)
@@ -32,4 +35,5 @@ open class BaseTokenizer(val tokens: Map<String, String>, val input: String) {
         curPos += longestToken.text.length
         return longestToken
     }
+    private fun isBlank(c: Char) = listOf(' ', '\n', '\t', '\r').contains(c)
 }

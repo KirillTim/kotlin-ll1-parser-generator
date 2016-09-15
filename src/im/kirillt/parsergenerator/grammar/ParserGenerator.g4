@@ -51,7 +51,7 @@ ruleChild[String ruleName] locals[ArrayList<RuleChild> children]
     String ruleArg = "";
 }
 @after {
-    ParserGenerator.addRule($ruleName, $children, ruleAction, "");
+    ParserGenerator.addRule($ruleName, $children, ruleAction);
 }
     : (ruleChildOptions {$children.add($ruleChildOptions.item);})* (ACTION {ruleAction = $ACTION.text;})?
     ;
@@ -90,6 +90,7 @@ TOKEN_KEYWORD : CAPITAL (LOWCASE|CAPITAL| '_' | DIGIT)* ;
 RULE_ARGUMENT
     : ('$' (LOWCASE|CAPITAL|'_') (LOWCASE|CAPITAL|'_'|DIGIT)* ('.' (LOWCASE|CAPITAL|'_') (LOWCASE|CAPITAL|'_'|DIGIT)*)*)
     | DIGIT+
+    | STRING_LITERAL_2
     ;
 
 CAPITAL:    'A'..'Z';
@@ -108,6 +109,10 @@ ACTION
 
 STRING_LITERAL
    : '\'' ('\'\'' | ~ ('\''))* '\''
+   ;
+
+STRING_LITERAL_2
+   : '"' ('""' | ~ ('"'))* '"'
    ;
 
 WS : [ \t\r\n]+ -> skip ;

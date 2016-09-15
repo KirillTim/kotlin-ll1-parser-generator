@@ -11,8 +11,8 @@ object TokenizerGenerator {
         return result
     }
 
-    fun generate(grammarName: String, tokens: Map<String, String>, folder:String = "myGen",
-                 packageName:String = folder) {
+    fun generate(grammarName: String, tokens: Map<String, String>, folder: String = "myGen",
+                 packageName: String = folder) {
         val className = "${grammarName}Tokenizer"
         val file = File("$folder/$className.kt")
         val result = StringBuilder()
