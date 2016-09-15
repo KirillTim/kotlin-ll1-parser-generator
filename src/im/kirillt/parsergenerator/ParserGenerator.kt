@@ -52,7 +52,7 @@ object ParserGenerator {
                     if (child is NonTerminal) {
                         val varName = "__" + child.name
                         val funCall = child.name
-                        indenter.writeln("val $varName = $funCall(${replacePlaceHolders(from, args)})")
+                        indenter.writeln("val $varName = $funCall(${replacePlaceHolders(from, args, listOf())})")
                         indenter.writeln("$resultCtxName.text += $varName.text")
                     } else if (child is Terminal) {
                         if (check) {
@@ -66,7 +66,7 @@ object ParserGenerator {
                         }
                     }
                 }
-                val action = replacePlaceHolders(from, sourceCode.dropWhile { it == '{' }.dropLastWhile { it == '}' })
+                val action = replacePlaceHolders(from, sourceCode.dropWhile { it == '{' }.dropLastWhile { it == '}' }, children)
                 indenter.writeln(action)
                 indenter.writeln("return $resultCtxName")
             }
@@ -84,13 +84,13 @@ object ParserGenerator {
         }
 
         companion object {
-            fun replacePlaceHolders(from: NonTerminal, code: String, resultCtxName: String = "__resultCtx"): String {
+            fun replacePlaceHolders(from: NonTerminal, code: String, children: List<RuleChild>,  resultCtxName: String = "__resultCtx"): String {
                 var result = code
                 val ruleArgName = ruleArgs[from.name]?.name
-                if (ruleArgName != null) {
-                    //result = code.replace("$$ruleArgName.")
+                if (ruleArgName != null)
                     result = code.replace("$$ruleArgName", "__$ruleArgName")
-                }
+                for (other in children.map { it.item }.filter { it is NonTerminal })
+                    result = result.replace(Regex("(${other.name}\\.[\\da-zA-Z]+)"), "$1!!")
                 val ruleReturns = ruleReturns[from.name]?.name
                 if (ruleReturns != null)
                     result = result.replace("$$ruleReturns", "$resultCtxName.$ruleReturns")
@@ -137,7 +137,7 @@ object ParserGenerator {
     }
 
     @JvmStatic
-            //add eps rule if left is empty
+    //add eps rule if left is empty
     fun addRule(nonTermName: String, left: ArrayList<RuleChild>, action: String) {
         val from = NonTerminal(nonTermName)
         nonTerminals.add(from)
@@ -182,7 +182,8 @@ object ParserGenerator {
         FOLLOW[START] = mutableSetOf(EOFTerminal)
         changed = true
         while (changed) {
-            val oldSize = FOLLOW.map { it.value.size }.sum()
+            val followSize = {FOLLOW.map { it.value.size }.sum()}
+            val oldSize = followSize()
             rules.forEach {
                 val A = it.key
                 for (alternative in it.value) {
@@ -201,7 +202,7 @@ object ParserGenerator {
                     }
                 }
             }
-            changed = FOLLOW.map { it.value.size }.sum() != oldSize
+            changed = followSize() != oldSize
         }
     }
 
