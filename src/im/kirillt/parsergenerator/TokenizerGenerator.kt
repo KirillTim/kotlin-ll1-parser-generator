@@ -1,17 +1,15 @@
 package im.kirillt.parsergenerator
 
+import im.kirillt.parsergenerator.ParserGenerator.TokenString
+
 import java.io.File
 
 object TokenizerGenerator {
-    private fun generateTokensClasses(tokens: Map<String, String>): List<String> {
-        val result = mutableListOf<String>()
-        for (tokenName in tokens.keys) {
-            result += "class Token$tokenName(text:String) : Token(\"$tokenName\", text)"
-        }
-        return result
+    private fun generateTokensClasses(tokenNames: List<String>): List<String> {
+        return tokenNames.map { "class Token$it(text:String) : Token(\"$it\", text)" }
     }
 
-    fun generate(grammarName: String, tokens: Map<String, String>, folder: String = "myGen",
+    fun generate(grammarName: String, tokens: Map<String, TokenString>, folder: String = "myGen",
                  packageName: String = folder) {
         val className = "${grammarName}Tokenizer"
         val file = File("$folder/$className.kt")
@@ -20,14 +18,15 @@ object TokenizerGenerator {
         indenter.writeln("package $packageName")
         indenter.writeln("import im.kirillt.parsergenerator.base.BaseTokenizer")
         indenter.writeln("import im.kirillt.parsergenerator.base.Token")
+        indenter.writeln("import im.kirillt.parsergenerator.ParserGenerator.TokenString")
         indenter.writeln("")
-        generateTokensClasses(tokens).forEach { indenter.writeln(it) }
+        generateTokensClasses(tokens.keys.toList()).forEach { indenter.writeln(it) }
         indenter.writeln("")
         indenter.writeln("private object namespace {")
         indenter.indented {
-            indenter.writeln("fun tokens(): Map<String, String> {")
+            indenter.writeln("fun tokens(): Map<String, TokenString> {")
             indenter.indented {
-                GeneratorUtils.generateMapStringStringSource(tokens, "tokens").forEach { indenter.writeln(it) }
+                GeneratorUtils.generateMapStringTokenStringSource(tokens, "tokens").forEach { indenter.writeln(it) }
                 indenter.writeln("return tokens")
             }
             indenter.writeln("}")

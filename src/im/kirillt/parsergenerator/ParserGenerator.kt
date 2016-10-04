@@ -106,33 +106,33 @@ object ParserGenerator {
     val EPS = Terminal("")
     @JvmField
     var grammarName = ""
-    val tokens = mutableMapOf<String, String>()
+    data class TokenString (var string: String = "", var isRegex: Boolean = false)
+    val tokens = mutableMapOf<String, TokenString>()
     private var unnamedTokensCount = 0
     val nonTerminals = mutableSetOf<NonTerminal>()
     val FIRST = mutableMapOf<NonTerminal, MutableSet<Terminal>>()
     val FOLLOW = mutableMapOf<NonTerminal, MutableSet<Terminal>>()
 
     @JvmStatic
-    fun addToken(string: String, name: String = ""): String {
-        var fixed = string
-        if (fixed.startsWith("'"))
-            fixed = fixed.drop(1)
-        if (fixed.endsWith("'"))
-            fixed = fixed.dropLast(1)
+    fun addToken(token: TokenString, name: String = ""): String {
+        if (token.string.startsWith("'"))
+            token.string = token.string.drop(1)
+        if (token.string.endsWith("'"))
+            token.string = token.string.dropLast(1)
         if (name.isEmpty()) {
             for ((name, token_regexp) in tokens) {
-                if (token_regexp.equals(fixed))
+                if (token_regexp.equals(token.string))
                     return name
             }
             unnamedTokensCount++
             val key = "_T_" + unnamedTokensCount;
-            tokens[key] = fixed
+            tokens[key] = token
             return key
         }
         if (tokens.containsKey(name))
             throw Exception("already have token with name '$name'")
 
-        tokens[name] = fixed
+        tokens[name] = token
         return name
     }
 

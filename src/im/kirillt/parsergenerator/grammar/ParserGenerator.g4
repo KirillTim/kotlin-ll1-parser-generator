@@ -7,6 +7,7 @@ import im.kirillt.parsergenerator.ParserGenerator.Terminal;
 import im.kirillt.parsergenerator.ParserGenerator.RuleItem;
 import im.kirillt.parsergenerator.ParserGenerator.RuleChild;
 import im.kirillt.parsergenerator.ParserGenerator.Variable;
+import im.kirillt.parsergenerator.ParserGenerator.TokenString;
 }
 
 input
@@ -59,8 +60,8 @@ ruleChild[String ruleName] locals[ArrayList<RuleChild> children]
 ruleChildOptions returns[RuleChild item]
     : ruleOption { $item = $ruleOption.item; Utils.p("rule");}
     | TOKEN_KEYWORD {$item = new RuleChild(new Terminal($TOKEN_KEYWORD.text), ""); Utils.p("token");}
-    | STRING_LITERAL {
-                        String name = ParserGenerator.addToken($STRING_LITERAL.text, "");
+    | rStingLiteral {
+                        String name = ParserGenerator.addToken($rStingLiteral.item, "");
                         $item = new RuleChild(new Terminal(name), "");
                         Utils.p("literal");
                     }
@@ -76,14 +77,21 @@ ruleOption returns[RuleChild item]
     ;
 
 token
-    : TOKEN_KEYWORD ':' STRING_LITERAL + ';'
+    : TOKEN_KEYWORD ':' rStingLiteral + ';'
     {
-        ParserGenerator.addToken($STRING_LITERAL.text, $TOKEN_KEYWORD.text);
+        ParserGenerator.addToken($rStingLiteral.item, $TOKEN_KEYWORD.text);
         Utils.p("token add");
     }
     ;
 
 id : RULE_KEYWORD | TOKEN_KEYWORD;
+
+rStingLiteral returns[TokenString item]
+@init {
+    $item = new TokenString();
+}
+    : ('r' {$item.setRegex(true);})? STRING_LITERAL {$item.setString($STRING_LITERAL.text);}
+    ;
 
 RULE_KEYWORD: LOWCASE (LOWCASE|CAPITAL| '_' | DIGIT)* ;
 TOKEN_KEYWORD : CAPITAL (LOWCASE|CAPITAL| '_' | DIGIT)* ;
