@@ -13,8 +13,7 @@ object TokenizerGenerator {
                  packageName: String = folder) {
         val className = "${grammarName}Tokenizer"
         val file = File("$folder/$className.kt")
-        val result = StringBuilder()
-        val indenter = GeneratorUtils.Indenter(result)
+        val indenter = GeneratorUtils.Indenter(StringBuilder())
         indenter.writeln("package $packageName")
         indenter.writeln("import im.kirillt.parsergenerator.base.BaseTokenizer")
         indenter.writeln("import im.kirillt.parsergenerator.base.Token")
@@ -45,6 +44,6 @@ object TokenizerGenerator {
             indenter.writeln("}")
         }
         indenter.writeln("}")
-        file.writeText(result.toString())
+        file.writeText(indenter.result.toString())
     }
 }

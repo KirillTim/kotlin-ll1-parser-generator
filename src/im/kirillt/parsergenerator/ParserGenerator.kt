@@ -7,7 +7,7 @@ import java.util.*
 
 object ParserGenerator {
     open class RuleItem(val name: String) {
-        override fun equals(other: Any?) = other is RuleItem && toString().equals(other.toString())
+        override fun equals(other: Any?) = other is RuleItem && toString() == other.toString()
 
         override fun hashCode() = toString().hashCode()
 
