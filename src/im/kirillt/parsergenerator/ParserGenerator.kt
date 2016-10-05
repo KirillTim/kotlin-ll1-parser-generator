@@ -78,19 +78,18 @@ object ParserGenerator {
         fun first(): List<Terminal> {
             val first = children.first().item
             if (first is Terminal)
-                return listOf(first);
+                return listOf(first)
             else
                 return rules[first]!!.flatMap { it.first() }
         }
 
         companion object {
-            fun replacePlaceHolders(from: NonTerminal, code: String, children: List<RuleChild>,  resultCtxName: String = "__resultCtx"): String {
+            fun replacePlaceHolders(from: NonTerminal, code: String, children: List<RuleChild>, resultCtxName: String = "__resultCtx"): String {
                 var result = code
+                result = result.replace(Regex("(\\$[a-zA-Z\\d]+\\.[\\da-zA-Z]+)"), "$1!!")
                 val ruleArgName = ruleArgs[from.name]?.name
                 if (ruleArgName != null)
-                    result = code.replace("$$ruleArgName", "__$ruleArgName")
-                for (other in children.map { it.item }.filter { it is NonTerminal })
-                    result = result.replace(Regex("(${other.name}\\.[\\da-zA-Z]+)"), "$1!!")
+                    result = result.replace("$$ruleArgName", "__$ruleArgName")
                 val ruleReturns = ruleReturns[from.name]?.name
                 if (ruleReturns != null)
                     result = result.replace("$$ruleReturns", "$resultCtxName.$ruleReturns")
@@ -106,7 +105,11 @@ object ParserGenerator {
     val EPS = Terminal("")
     @JvmField
     var grammarName = ""
-    data class TokenString (var string: String = "", var isRegex: Boolean = false)
+    @JvmField
+    var parserHeader = ""
+
+    data class TokenString(var string: String = "", var isRegex: Boolean = false)
+
     val tokens = mutableMapOf<String, TokenString>()
     private var unnamedTokensCount = 0
     val nonTerminals = mutableSetOf<NonTerminal>()
@@ -137,7 +140,7 @@ object ParserGenerator {
     }
 
     @JvmStatic
-    //add eps rule if left is empty
+            //add eps rule if left is empty
     fun addRule(nonTermName: String, left: ArrayList<RuleChild>, action: String) {
         val from = NonTerminal(nonTermName)
         nonTerminals.add(from)
@@ -182,7 +185,7 @@ object ParserGenerator {
         FOLLOW[START] = mutableSetOf(EOFTerminal)
         changed = true
         while (changed) {
-            val followSize = {FOLLOW.map { it.value.size }.sum()}
+            val followSize = { FOLLOW.map { it.value.size }.sum() }
             val oldSize = followSize()
             rules.forEach {
                 val A = it.key
@@ -265,6 +268,8 @@ object ParserGenerator {
         val className = "${grammarName}Parser"
         val file = File("$folder/$className.kt")
         var str = "package $packageName\nimport im.kirillt.parsergenerator.base.BaseRuleContext\nimport $folder.${grammarName}Tokenizer\n"
+        parserHeader = parserHeader.dropWhile { it == '{' }.dropLastWhile { it == '}' }
+        str += parserHeader + "\n"
         constructFirstAndFollow()
         generateContextClasses().forEach { str += it + "\n" }
         str += "class $className(val tokenizer: ${grammarName}Tokenizer) {\n"

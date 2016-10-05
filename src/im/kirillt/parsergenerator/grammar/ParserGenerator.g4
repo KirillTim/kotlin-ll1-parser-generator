@@ -21,6 +21,7 @@ line
 
 grammaHeader
     : 'grammar' id ';' {ParserGenerator.grammarName = $id.text;}
+        ('@header' ACTION {ParserGenerator.parserHeader = $ACTION.text;})?
     ;
 
 ruleR :
