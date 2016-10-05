@@ -114,14 +114,14 @@ object ParserGenerator {
     val FOLLOW = mutableMapOf<NonTerminal, MutableSet<Terminal>>()
 
     @JvmStatic
-    fun addToken(token: TokenString, name: String = ""): String {
+    fun addToken(token: TokenString, tokenName: String = ""): String {
         if (token.string.startsWith("'"))
             token.string = token.string.drop(1)
         if (token.string.endsWith("'"))
             token.string = token.string.dropLast(1)
-        if (name.isEmpty()) {
-            for ((name, token_regexp) in tokens) {
-                if (token_regexp.equals(token.string))
+        if (tokenName.isEmpty()) {
+            for ((name, tokenRegexp) in tokens) {
+                if (tokenRegexp.string == token.string)
                     return name
             }
             unnamedTokensCount++
@@ -129,11 +129,11 @@ object ParserGenerator {
             tokens[key] = token
             return key
         }
-        if (tokens.containsKey(name))
-            throw Exception("already have token with name '$name'")
+        if (tokens.containsKey(tokenName))
+            throw Exception("already have token with tokenName '$tokenName'")
 
-        tokens[name] = token
-        return name
+        tokens[tokenName] = token
+        return tokenName
     }
 
     @JvmStatic
