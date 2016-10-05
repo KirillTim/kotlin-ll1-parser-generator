@@ -5,7 +5,7 @@ start returns [v: Int]
     ;
 
 e returns [v: Int]
-    : '\+' t e { $v = $t.v + $e.v; }
+    : '+' t e { $v = $t.v + $e.v; }
     | { $v = 0; }
     ;
 
@@ -14,15 +14,15 @@ t returns [v: Int]
     ;
 
 d returns [v: Int]
-    : '\*' f d { $v = $f.v * $d.v; }
+    : '*' f d { $v = $f.v * $d.v; }
     | { $v = 1; println("EPS in d"); }
     ;
 
 f returns [v: Int]
     : num { $v = $num.text.toInt(); println("get num="+$v);}
-    | '\(' start '\)' { $v = $start.v; }
+    | '(' start ')' { $v = $start.v; }
     ;
 
 num : NUM;
 
-NUM : '[0-9]+';
+NUM : r'[0-9]+';

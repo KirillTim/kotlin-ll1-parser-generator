@@ -1,21 +1,14 @@
+grammar input;
 
-start : 'var' rule_L ;
+start : vaaaar variable ':' Type ';';
 
-rule_L : rule_D ';' rule_Lp ;
+vaaaar : Var {println("get var keyword")};
 
-rule_Lp  : EPS
-    | rule_L
-    ;
+Var : 'var';
 
-rule_D : rule_N ':' Type ;
+Type : 'Integer' ;
 
-rule_N : Variable rule_Np ;
+variable : Variable {println("get variable tokenName")};
 
-rule_Np  : EPS
-    | ',' rule_N
-    ;
-
-Type : 'type' ;
-
-Variable : 'variable' ;
+Variable : r'[a-zA-Z]+' ;
 

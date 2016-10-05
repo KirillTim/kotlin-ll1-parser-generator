@@ -15,7 +15,14 @@ cont
 line returns [res : Int]
     : variable '=' expr ';' {$res = $expr.v; map[$variable.text] = $expr.v; println($variable.text+" = "+$expr.v)};
 
-expr returns[v : Int]: item exprCont[$item.res] {$v = $exprCont.x};
+expr returns[v : Int]
+    : item exprCont[$item.res] {$v = $exprCont.x}
+    | '(' expr1 ')' {$v = $expr1.b}
+    ;
+
+expr1 returns[b : Int]
+    : expr {$b = $expr.v}
+    ;
 
 exprCont[fst : Int] returns[x : Int]
     : '+' expr {$x = $fst + $expr.v;}
